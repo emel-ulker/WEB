@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luxury Portfolio</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #c4211f; /* Matched video background */
+            font-family: 'Inter', sans-serif;
+            cursor: none; /* Hide default cursor for custom one */
+        }
+        .cursive-name {
+            font-family: 'Dancing Script', cursive;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        .glass-pill {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        /* Magnetic Cursor Styles */
+        #cursor-dot {
+            position: fixed;
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px rgba(255,255,255,0.8);
+            transition: transform 0.1s ease-out;
+        }
+        #cursor-ring {
+            position: fixed;
+            width: 32px;
+            height: 32px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9998;
+            transform: translate(-50%, -50%);
+            transition: width 0.2s ease-out, height 0.2s ease-out, border-color 0.2s ease-out;
+        }
+        .hover-target:hover ~ #cursor-ring,
+        .hover-target:hover ~ #cursor-dot {
+            /* Handled in JS for smooth scaling */
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useEffect, useRef, useState } = React;
+
+        function App() {
+            const canvasRef = useRef(null);
+            const framesRef = useRef([]);
+            const centerFrameRef = useRef(null);
+            const imagesLoadedRef = useRef(0);
+            
+            // UI Refs to avoid re-renders
+            const cursorDotRef = useRef(null);
+            const cursorRingRef = useRef(null);
+            const [isHovering, setIsHovering] = useState(false);
+            const [activeModal, setActiveModal] = useState(null);
+
+            const cvData = {
+                experience: [
+                    { role: "Intern", company: "GESIS – Leibniz Institute", date: "July 2025 – August 2025", desc: "Assisted with data collection, documentation, and analysis for social science research projects. Supported preparation of structured reports." },
+                    { role: "Student Research Assistant", company: "University of Mannheim", date: "May 2024 – July 2024", desc: "Conducted quantitative and qualitative data analysis. Prepared research reports and visual presentations for academic dissemination." },
+                    { role: "Project Management Intern", company: "Bongo Art Project", date: "March 2023 – September 2023", desc: "Supported project coordination and process organization. Organized project data and contributed to outcome evaluation using measurable indicators." }
+                ],
+                education: [
+                    { degree: "M.A. Sociology", school: "University of Mannheim, Germany", date: "Completed" },
+                    { degree: "B.A. Sociology", school: "TED University, Turkey", date: "Sep 2017 - Jan 2023", extra: "Honor Degree | Secondary Field: Global Citizenship" }
+                ],
+                contact: { email: "soc.emelulker@hotmail.com", phone: "+49 (1520)1364387", linkedin: "linkedin.com/in/emel-ulker" }
+            };
+
+            // Angle state for smooth rotation
+            const currentAngleRef = useRef(0);
+            const targetAngleRef = useRef(0);
+            
+            // Mouse refs to avoid stale closures in rAF
+            const mouseX = useRef(window.innerWidth / 2);
+            const mouseY = useRef(window.innerHeight / 2);
+            const cursorPos = useRef({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+
+            // Preload frames
+            useEffect(() => {
+                const totalFrames = 64;
+                const frames = [];
+                
+                for (let i = 0; i < totalFrames; i++) {
+                    const img = new Image();
+                    const paddedIndex = String(i).padStart(4, '0');
+                    img.src = `public/frames/${paddedIndex}.webp`;
+                    img.onload = () => {
+                        imagesLoadedRef.current++;
+                    };
+                    frames.push(img);
+                }
+                framesRef.current = frames;
+
+                const centerImg = new Image();
+                centerImg.src = `public/frames/center.webp`;
+                centerImg.onload = () => {
+                    imagesLoadedRef.current++;
+                };
+                centerFrameRef.current = centerImg;
+            }, []);
+
+            // Math utils
+            const lerpAngle = (a, b, t) => {
+                let delta = b - a;
+                while (delta > Math.PI) delta -= 2 * Math.PI;
+                while (delta < -Math.PI) delta += 2 * Math.PI;
+                return a + delta * t;
+            };
+
+            const lerp = (start, end, t) => start + (end - start) * t;
+
+            // Main Animation Loop
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d', { alpha: false }); // Optimize for no alpha
+                let animationFrameId;
+
+                const render = () => {
+                    const width = window.innerWidth;
+                    const height = window.innerHeight;
+                    
+                    if (canvas.width !== width || canvas.height !== height) {
+                        canvas.width = width;
+                        canvas.height = height;
+                    }
+
+                    // Only render if all images are loaded (64 frames + 1 center = 65)
+                    if (imagesLoadedRef.current >= 65) {
+                        const faceCenterX = width / 2;
+                        const faceCenterY = height / 2;
+                        
+                        const dx = mouseX.current - faceCenterX;
+                        const dy = mouseY.current - faceCenterY;
+                        
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        const maxDist = Math.max(width, height);
+                        
+                        // Deadzone for center looking (~12% screen radius)
+                        const isCenter = dist < (width * 0.12);
+
+                        if (isCenter) {
+                            ctx.fillStyle = "#c4211f";
+                            ctx.fillRect(0, 0, width, height);
+                            // Draw center frame
+                            const img = centerFrameRef.current;
+                            drawCover(ctx, img, width, height);
+                        } else {
+                            // Calculate angle relative to face center
+                            // Shift by Math.PI/2 to align 0 degrees with UP
+                            let angle = Math.atan2(dy, dx) + Math.PI / 2;
+                            if (angle < 0) angle += 2 * Math.PI;
+                            
+                            targetAngleRef.current = angle;
+                            
+                            // Smooth interpolation for zero lag/ghosting
+                            // Increased factor from 0.26 to 0.65 for much faster, snappier tracking
+                            currentAngleRef.current = lerpAngle(currentAngleRef.current, targetAngleRef.current, 0.65);
+                            
+                            // Map angle (0 to 2PI) to frame index (0 to 63)
+                            let normalizedAngle = currentAngleRef.current;
+                            if (normalizedAngle < 0) normalizedAngle += 2 * Math.PI;
+                            
+                            let frameIndex = Math.floor((normalizedAngle / (2 * Math.PI)) * 64) % 64;
+                            if (frameIndex < 0) frameIndex = 0;
+                            
+                            ctx.fillStyle = "#c4211f";
+                            ctx.fillRect(0, 0, width, height);
+                            
+                            const img = framesRef.current[frameIndex];
+                            if (img && img.complete) {
+                                drawCover(ctx, img, width, height);
+                            }
+                        }
+                    } else {
+                        // Loading state
+                        ctx.fillStyle = "#c4211f";
+                        ctx.fillRect(0, 0, width, height);
+                        ctx.fillStyle = "white";
+                        ctx.font = "20px Inter";
+                        ctx.fillText(`Loading frames... ${Math.round((imagesLoadedRef.current / 65) * 100)}%`, width/2 - 80, height/2);
+                    }
+
+                    // Update cursor positions directly via DOM for zero-lag React performance
+                    cursorPos.current.x = lerp(cursorPos.current.x, mouseX.current, 0.25);
+                    cursorPos.current.y = lerp(cursorPos.current.y, mouseY.current, 0.25);
+                    
+                    if (cursorDotRef.current) {
+                        cursorDotRef.current.style.left = `${mouseX.current}px`;
+                        cursorDotRef.current.style.top = `${mouseY.current}px`;
+                    }
+                    if (cursorRingRef.current) {
+                        cursorRingRef.current.style.left = `${cursorPos.current.x}px`;
+                        cursorRingRef.current.style.top = `${cursorPos.current.y}px`;
+                    }
+
+                    animationFrameId = requestAnimationFrame(render);
+                };
+
+                const handleMouseMove = (e) => {
+                    mouseX.current = e.clientX;
+                    mouseY.current = e.clientY;
+                };
+
+                window.addEventListener('mousemove', handleMouseMove);
+                render();
+
+                return () => {
+                    window.removeEventListener('mousemove', handleMouseMove);
+                    cancelAnimationFrame(animationFrameId);
+                };
+            }, []); // Empty dependency array ensures no re-renders!
+            
+            // Re-initialize icons
+            useEffect(() => {
+                lucide.createIcons();
+            });
+
+            // Helper to draw image as 'object-fit: cover'
+            const drawCover = (ctx, img, canvasWidth, canvasHeight) => {
+                const imgRatio = img.width / img.height;
+                const canvasRatio = canvasWidth / canvasHeight;
+                let drawWidth, drawHeight, offsetX, offsetY;
+
+                if (canvasRatio > imgRatio) {
+                    drawWidth = canvasWidth;
+                    drawHeight = canvasWidth / imgRatio;
+                    offsetX = 0;
+                    offsetY = (canvasHeight - drawHeight) / 2;
+                } else {
+                    drawWidth = canvasHeight * imgRatio;
+                    drawHeight = canvasHeight;
+                    offsetX = (canvasWidth - drawWidth) / 2;
+                    offsetY = 0;
+                }
+
+                ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+            };
+
+            return (
+                <div className="relative w-screen h-screen overflow-hidden">
+                    {/* Canvas Background */}
+                    <canvas 
+                        ref={canvasRef} 
+                        className="absolute inset-0 z-0 pointer-events-none"
+                    />
+
+                    {/* Magnetic Cursor */}
+                    <div 
+                        id="cursor-dot" 
+                        ref={cursorDotRef}
+                        style={{ transform: `translate(-50%, -50%) scale(${isHovering ? 0 : 1})` }}
+                    ></div>
+                    <div 
+                        id="cursor-ring"
+                        ref={cursorRingRef}
+                        style={{
+                            width: isHovering ? '64px' : '32px',
+                            height: isHovering ? '64px' : '32px',
+                            backgroundColor: isHovering ? 'rgba(255,255,255,0.1)' : 'transparent',
+                            borderColor: isHovering ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.5)'
+                        }}
+                    ></div>
+
+                    {/* Header */}
+                    <div className="absolute top-8 left-0 right-0 flex justify-center z-10">
+                        <nav className="glass-pill rounded-full px-8 py-4 flex gap-12 text-white/90 text-sm tracking-widest uppercase font-semibold">
+                            <button onClick={() => setActiveModal('experience')} className="hover:text-white transition-colors hover-target uppercase tracking-widest" 
+                               onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}>Experience</button>
+                            <button onClick={() => setActiveModal('education')} className="hover:text-white transition-colors hover-target uppercase tracking-widest"
+                               onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}>Education</button>
+                            <button onClick={() => setActiveModal('contact')} className="hover:text-white transition-colors hover-target uppercase tracking-widest"
+                               onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}>Contact</button>
+                        </nav>
+                    </div>
+
+                    {/* Hero Typography */}
+                    <div className="absolute bottom-16 left-16 z-10 flex flex-col gap-4 text-white">
+                        <div className="text-xl font-light tracking-wide text-white/80">Hi, I'm</div>
+                        <h1 className="cursive-name text-8xl -mt-6">Emel Ülker</h1>
+                        <p className="max-w-[380px] text-white/70 text-sm leading-relaxed mt-2 font-light">
+                            Sociologist with a Master's degree from the University of Mannheim. Experienced in data analysis, reporting, and translating complex research into structured, actionable insights.
+                        </p>
+                        
+                        <div className="flex gap-4 mt-6">
+                            <button 
+                                className="bg-white text-black px-6 py-3 rounded-full font-medium flex items-center gap-2 hover:scale-105 transition-transform hover-target"
+                                onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}
+                            >
+                                Resume <i data-lucide="arrow-up-right" className="w-4 h-4"></i>
+                            </button>
+                            <button 
+                                onClick={() => setActiveModal('contact')}
+                                className="glass-pill px-6 py-3 rounded-full font-medium text-white hover:bg-white/20 transition-colors hover-target"
+                                onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}
+                            >
+                                Let's Talk
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Modal Overlay */}
+                    {activeModal && (
+                        <div className="absolute inset-0 z-50 flex items-center justify-center p-8 bg-black/40 backdrop-blur-sm">
+                            <div className="glass-pill w-full max-w-2xl rounded-2xl p-8 text-white relative animate-fade-in shadow-2xl">
+                                <button 
+                                    onClick={() => setActiveModal(null)}
+                                    className="absolute top-6 right-6 text-white/60 hover:text-white hover-target"
+                                    onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}
+                                >
+                                    <i data-lucide="x" className="w-6 h-6"></i>
+                                </button>
+                                
+                                <h2 className="text-3xl font-light mb-6 uppercase tracking-widest text-white/90">
+                                    {activeModal}
+                                </h2>
+                                
+                                <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-4 custom-scrollbar">
+                                    {activeModal === 'experience' && cvData.experience.map((exp, i) => (
+                                        <div key={i} className="border-b border-white/10 pb-6 last:border-0 last:pb-0">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <h3 className="text-lg font-semibold">{exp.role}</h3>
+                                                    <div className="text-white/60 text-sm">{exp.company}</div>
+                                                </div>
+                                                <div className="text-white/40 text-sm text-right">{exp.date}</div>
+                                            </div>
+                                            <p className="text-white/70 text-sm leading-relaxed">{exp.desc}</p>
+                                        </div>
+                                    ))}
+                                    
+                                    {activeModal === 'education' && cvData.education.map((edu, i) => (
+                                        <div key={i} className="border-b border-white/10 pb-6 last:border-0 last:pb-0">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <h3 className="text-lg font-semibold">{edu.degree}</h3>
+                                                    <div className="text-white/60 text-sm">{edu.school}</div>
+                                                </div>
+                                                <div className="text-white/40 text-sm text-right">{edu.date}</div>
+                                            </div>
+                                            {edu.extra && <p className="text-white/70 text-sm mt-2">{edu.extra}</p>}
+                                        </div>
+                                    ))}
+
+                                    {activeModal === 'contact' && (
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-4 border-b border-white/10 pb-4">
+                                                <i data-lucide="mail" className="w-5 h-5 text-white/60"></i>
+                                                <a href={`mailto:${cvData.contact.email}`} className="text-lg hover:text-white/70 transition-colors hover-target">{cvData.contact.email}</a>
+                                            </div>
+                                            <div className="flex items-center gap-4 border-b border-white/10 pb-4">
+                                                <i data-lucide="phone" className="w-5 h-5 text-white/60"></i>
+                                                <span className="text-lg">{cvData.contact.phone}</span>
+                                            </div>
+                                            <div className="flex items-center gap-4 border-b border-white/10 pb-4">
+                                                <i data-lucide="linkedin" className="w-5 h-5 text-white/60"></i>
+                                                <a href={`https://${cvData.contact.linkedin}`} target="_blank" className="text-lg hover:text-white/70 transition-colors hover-target">{cvData.contact.linkedin}</a>
+                                            </div>
+                                            <div className="flex items-center gap-4 pt-2">
+                                                <i data-lucide="map-pin" className="w-5 h-5 text-white/60"></i>
+                                                <span className="text-lg text-white/80">Mannheim, Germany</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
