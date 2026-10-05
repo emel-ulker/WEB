@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Luxury Portfolio</title>
+    <title>Emel Ülker</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
@@ -89,7 +89,7 @@
                     { role: "Project Management Intern", company: "Bongo Art Project", date: "March 2023 – September 2023", desc: "Supported project coordination and process organization. Organized project data and contributed to outcome evaluation using measurable indicators." }
                 ],
                 education: [
-                    { degree: "M.A. Sociology", school: "University of Mannheim, Germany", date: "Completed" },
+                    { degree: "M.A. Sociology", school: "University of Mannheim, Germany", date: "2023 - 2026" },
                     { degree: "B.A. Sociology", school: "TED University, Turkey", date: "Sep 2017 - Jan 2023", extra: "Honor Degree | Secondary Field: Global Citizenship" }
                 ],
                 contact: { email: "soc.emelulker@hotmail.com", linkedin: "linkedin.com/in/emel-ulker" }
@@ -377,15 +377,13 @@
                                                 <a href={`mailto:${cvData.contact.email}`} className="text-lg hover:text-white/70 transition-colors hover-target">{cvData.contact.email}</a>
                                             </div>
                                             <div className="flex items-center gap-4 border-b border-white/10 pb-4">
-                                                <i data-lucide="phone" className="w-5 h-5 text-white/60"></i>
-                                                <span className="text-lg">{cvData.contact.phone}</span>
-                                            </div>
-                                            <div className="flex items-center gap-4 border-b border-white/10 pb-4">
                                                 <i data-lucide="linkedin" className="w-5 h-5 text-white/60"></i>
                                                 <a href={`https://${cvData.contact.linkedin}`} target="_blank" className="text-lg hover:text-white/70 transition-colors hover-target">{cvData.contact.linkedin}</a>
                                             </div>
-                                            
-                                    
+                                            <div className="flex items-center gap-4 pt-2">
+                                                <i data-lucide="map-pin" className="w-5 h-5 text-white/60"></i>
+                                                <span className="text-lg text-white/80">Ankara, Türkiye</span>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
